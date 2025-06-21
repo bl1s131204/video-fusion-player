@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCw, Settings, Download, Share2, Heart, MoreVertical, PictureInPicture2, SkipBack, SkipForward, Rewind, FastForward, Lock, Unlock } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCw, Settings, Download, Share2, Heart, MoreVertical, PictureInPicture2, SkipBack, SkipForward, Rewind, FastForward, Lock, Unlock, ThumbsUp, ThumbsDown, Share, Bookmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
@@ -531,21 +531,32 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
   // YouTube UI
   const renderYouTubeUI = () => (
     <div className={`${isDarkTheme ? 'bg-gray-900 text-white' : 'bg-white text-black'} min-h-screen`}>
-      {/* Header */}
-      <div className="p-4 border-b border-gray-700">
-        <div className="flex items-center justify-between">
+      {/* YouTube Header */}
+      <div className={`${isDarkTheme ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border-b sticky top-0 z-50`}>
+        <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-red-600 rounded-sm flex items-center justify-center">
+                <span className="text-white font-bold text-sm">▶</span>
+              </div>
+              <span className="text-xl font-medium">YouTube</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-3">
             <Button
               variant="ghost"
+              size="sm"
               onClick={() => setUiMode('mx')}
-              className={isDarkTheme ? 'text-white hover:bg-gray-800' : 'text-black hover:bg-gray-100'}
+              className={`${isDarkTheme ? 'text-white hover:bg-gray-800' : 'text-black hover:bg-gray-100'} text-sm px-3 py-1`}
             >
-              Switch to MX UI
+              MX Player Mode
             </Button>
             <Button
               variant="ghost"
+              size="sm"
               onClick={() => setIsDarkTheme(!isDarkTheme)}
-              className={isDarkTheme ? 'text-white hover:bg-gray-800' : 'text-black hover:bg-gray-100'}
+              className={`${isDarkTheme ? 'text-white hover:bg-gray-800' : 'text-black hover:bg-gray-100'} w-9 h-9 p-0`}
             >
               {isDarkTheme ? '☀️' : '🌙'}
             </Button>
@@ -553,189 +564,294 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
         </div>
       </div>
 
-      {/* Video Player Area */}
-      <div className="aspect-video bg-black relative max-w-4xl mx-auto">
-        {videoUrl ? (
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            className="w-full h-full"
-            style={{
-              transform: `rotate(${rotation}deg)`,
-              filter: `brightness(${brightness}%) contrast(${contrast}%)`
-            }}
-            onLoadedMetadata={handleLoadedMetadata}
-            onTimeUpdate={handleTimeUpdate}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onError={handleError}
-            controls={false}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-800">
-            <div className="text-center text-white">
-              <div className="text-4xl mb-4">📺</div>
-              <div className="text-xl mb-2">Select a video to start watching</div>
-            </div>
-          </div>
-        )}
-
-        {/* YouTube-style Controls */}
-        {showControls && videoUrl && (
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/50 to-transparent p-4">
-            {/* Progress Bar */}
-            <div className="mb-4">
-              <Slider
-                value={[duration > 0 ? (currentTime / duration) * 100 : 0]}
-                onValueChange={handleSeek}
-                max={100}
-                step={0.1}
-                className="w-full [&_[role=slider]]:bg-red-600 [&_[role=slider]]:border-red-600"
+      <div className="max-w-7xl mx-auto">
+        {/* Video Player Container */}
+        <div className="relative">
+          <div className="aspect-video bg-black relative">
+            {videoUrl ? (
+              <video
+                ref={videoRef}
+                src={videoUrl}
+                className="w-full h-full"
+                style={{
+                  transform: `rotate(${rotation}deg)`,
+                  filter: `brightness(${brightness}%) contrast(${contrast}%)`
+                }}
+                onLoadedMetadata={handleLoadedMetadata}
+                onTimeUpdate={handleTimeUpdate}
+                onPlay={handlePlay}
+                onPause={handlePause}
+                onError={handleError}
+                controls={false}
+                onClick={resetControlsTimeout}
+                onMouseMove={resetControlsTimeout}
               />
-            </div>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-black">
+                <div className="text-center text-white">
+                  <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Play className="w-8 h-8 ml-1" />
+                  </div>
+                  <div className="text-xl mb-2 font-medium">Select a video to watch</div>
+                  <div className="text-gray-400">Drag and drop or click to upload</div>
+                </div>
+              </div>
+            )}
 
-            {/* Control Bar */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={togglePlay}
-                  className="text-white hover:bg-white/20"
-                >
-                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => skipTime(-10)}
-                  className="text-white hover:bg-white/20"
-                >
-                  <SkipBack className="w-5 h-5" />
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => skipTime(10)}
-                  className="text-white hover:bg-white/20"
-                >
-                  <SkipForward className="w-5 h-5" />
-                </Button>
-
-                <div className="flex items-center space-x-2">
+            {/* YouTube-style Controls Overlay */}
+            {showControls && videoUrl && (
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent">
+                {/* Top gradient for better text visibility */}
+                <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black/60 to-transparent" />
+                
+                {/* Center Play Button */}
+                <div className="absolute inset-0 flex items-center justify-center">
                   <Button
                     variant="ghost"
-                    size="sm"
-                    onClick={toggleMute}
-                    className="text-white hover:bg-white/20"
+                    size="lg"
+                    onClick={togglePlay}
+                    className="w-20 h-20 rounded-full bg-black/80 hover:bg-red-600/90 text-white transition-all duration-200 backdrop-blur-sm"
                   >
-                    {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8 ml-1" />}
                   </Button>
-                  <div className="w-16">
-                    <Slider
-                      value={[isMuted ? 0 : volume * 100]}
-                      onValueChange={handleVolumeChange}
-                      max={100}
-                      step={1}
-                    />
-                  </div>
                 </div>
 
-                <span className="text-white text-sm">
-                  {formatTime(currentTime)} / {formatTime(duration)}
-                </span>
+                {/* Bottom Controls */}
+                <div className="absolute bottom-0 left-0 right-0 p-4">
+                  {/* Progress Bar */}
+                  <div className="mb-4">
+                    <Slider
+                      value={[duration > 0 ? (currentTime / duration) * 100 : 0]}
+                      onValueChange={handleSeek}
+                      max={100}
+                      step={0.1}
+                      className="w-full [&_[role=slider]]:bg-red-600 [&_[role=slider]]:border-red-600 [&_.bg-primary]:bg-red-600 [&_[role=slider]]:w-4 [&_[role=slider]]:h-4"
+                    />
+                    <div className="flex justify-between text-white text-sm mt-1">
+                      <span>{formatTime(currentTime)}</span>
+                      <span>{formatTime(duration)}</span>
+                    </div>
+                  </div>
+
+                  {/* Control Bar */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={togglePlay}
+                        className="text-white hover:bg-white/20 w-10 h-10 p-0"
+                      >
+                        {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => skipTime(-10)}
+                        className="text-white hover:bg-white/20 w-10 h-10 p-0"
+                      >
+                        <SkipBack className="w-5 h-5" />
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => skipTime(10)}
+                        className="text-white hover:bg-white/20 w-10 h-10 p-0"
+                      >
+                        <SkipForward className="w-5 h-5" />
+                      </Button>
+
+                      <div className="flex items-center space-x-2 ml-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={toggleMute}
+                          className="text-white hover:bg-white/20 w-10 h-10 p-0"
+                        >
+                          {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                        </Button>
+                        <div className="w-20">
+                          <Slider
+                            value={[isMuted ? 0 : volume * 100]}
+                            onValueChange={handleVolumeChange}
+                            max={100}
+                            step={1}
+                            className="[&_[role=slider]]:bg-white [&_[role=slider]]:border-white [&_.bg-primary]:bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <span className="text-white text-sm ml-4">
+                        {formatTime(currentTime)} / {formatTime(duration)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <select
+                        value={playbackRate}
+                        onChange={(e) => changePlaybackSpeed(Number(e.target.value))}
+                        className="bg-transparent text-white text-sm border border-gray-600 rounded px-2 py-1 hover:bg-white/10 transition-colors"
+                      >
+                        <option value={0.25} className="bg-gray-900">0.25x</option>
+                        <option value={0.5} className="bg-gray-900">0.5x</option>
+                        <option value={0.75} className="bg-gray-900">0.75x</option>
+                        <option value={1} className="bg-gray-900">Normal</option>
+                        <option value={1.25} className="bg-gray-900">1.25x</option>
+                        <option value={1.5} className="bg-gray-900">1.5x</option>
+                        <option value={2} className="bg-gray-900">2x</option>
+                      </select>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowSettings(true)}
+                        className="text-white hover:bg-white/20 w-10 h-10 p-0"
+                      >
+                        <Settings className="w-4 h-4" />
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={togglePictureInPicture}
+                        className="text-white hover:bg-white/20 w-10 h-10 p-0"
+                      >
+                        <PictureInPicture2 className="w-4 h-4" />
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={toggleFullscreen}
+                        className="text-white hover:bg-white/20 w-10 h-10 p-0"
+                      >
+                        {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
+            )}
+          </div>
+        </div>
 
-              <div className="flex items-center space-x-2">
-                <select
-                  value={playbackRate}
-                  onChange={(e) => changePlaybackSpeed(Number(e.target.value))}
-                  className="bg-transparent text-white text-sm border border-gray-600 rounded px-2 py-1"
-                >
-                  <option value={0.25} className="bg-gray-900">0.25x</option>
-                  <option value={0.5} className="bg-gray-900">0.5x</option>
-                  <option value={0.75} className="bg-gray-900">0.75x</option>
-                  <option value={1} className="bg-gray-900">Normal</option>
-                  <option value={1.25} className="bg-gray-900">1.25x</option>
-                  <option value={1.5} className="bg-gray-900">1.5x</option>
-                  <option value={2} className="bg-gray-900">2x</option>
-                </select>
+        {/* Video Info & Actions */}
+        {videoMetadata && (
+          <div className="p-6">
+            {/* Video Title */}
+            <h1 className="text-xl font-semibold mb-3 leading-tight">{videoMetadata.name}</h1>
+            
+            {/* Video Stats */}
+            <div className={`text-sm mb-4 flex items-center space-x-2 ${isDarkTheme ? 'text-gray-400' : 'text-gray-600'}`}>
+              <span>{(videoMetadata.size / (1024 * 1024)).toFixed(1)} MB</span>
+              <span>•</span>
+              <span>{formatTime(videoMetadata.duration)}</span>
+              <span>•</span>
+              <span className="text-green-600 font-medium">HD</span>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex items-center space-x-1 mb-6">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  const isFav = favorites.includes(videoMetadata.name);
+                  if (isFav) {
+                    setFavorites(prev => prev.filter(name => name !== videoMetadata.name));
+                  } else {
+                    setFavorites(prev => [...prev, videoMetadata.name]);
+                  }
+                }}
+                className={`flex items-center space-x-2 rounded-full px-4 py-2 ${
+                  favorites.includes(videoMetadata.name) 
+                    ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' 
+                    : isDarkTheme 
+                      ? 'hover:bg-gray-800 text-gray-300' 
+                      : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <ThumbsUp className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  {favorites.includes(videoMetadata.name) ? 'Liked' : 'Like'}
+                </span>
+              </Button>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowSettings(true)}
-                  className="text-white hover:bg-white/20"
-                >
-                  <Settings className="w-4 h-4" />
-                </Button>
+              <Button
+                variant="ghost"
+                className={`flex items-center space-x-2 rounded-full px-4 py-2 ${
+                  isDarkTheme ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <ThumbsDown className="w-4 h-4" />
+                <span className="text-sm font-medium">Dislike</span>
+              </Button>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={togglePictureInPicture}
-                  className="text-white hover:bg-white/20"
-                >
-                  <PictureInPicture2 className="w-4 h-4" />
-                </Button>
+              <Button
+                variant="ghost"
+                className={`flex items-center space-x-2 rounded-full px-4 py-2 ${
+                  isDarkTheme ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <Share className="w-4 h-4" />
+                <span className="text-sm font-medium">Share</span>
+              </Button>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={toggleFullscreen}
-                  className="text-white hover:bg-white/20"
-                >
-                  {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-                </Button>
+              <Button
+                variant="ghost"
+                className={`flex items-center space-x-2 rounded-full px-4 py-2 ${
+                  isDarkTheme ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <Download className="w-4 h-4" />
+                <span className="text-sm font-medium">Download</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                className={`rounded-full w-10 h-10 p-0 ${
+                  isDarkTheme ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <Bookmark className="w-4 h-4" />
+                <span className="text-sm font-medium">Save</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                className={`rounded-full w-10 h-10 p-0 ${
+                  isDarkTheme ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Channel/Uploader Info */}
+            <div className={`border-t pt-4 ${isDarkTheme ? 'border-gray-800' : 'border-gray-200'}`}>
+              <div className="flex items-start space-x-3">
+                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-bold text-sm">📁</span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2">
+                    <h3 className="font-medium">Local Files</h3>
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      isDarkTheme ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      Offline
+                    </span>
+                  </div>
+                  <p className={`text-sm mt-1 ${isDarkTheme ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Playing from your local device storage
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* Video Info & Actions */}
-      {videoMetadata && (
-        <div className="max-w-4xl mx-auto p-4">
-          <h1 className="text-xl font-semibold mb-2">{videoMetadata.name}</h1>
-          <div className="text-sm text-gray-400 mb-4">
-            {(videoMetadata.size / (1024 * 1024)).toFixed(1)} MB • {formatTime(videoMetadata.duration)}
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                const isFav = favorites.includes(videoMetadata.name);
-                if (isFav) {
-                  setFavorites(prev => prev.filter(name => name !== videoMetadata.name));
-                } else {
-                  setFavorites(prev => [...prev, videoMetadata.name]);
-                }
-              }}
-              className={`${favorites.includes(videoMetadata.name) ? 'text-red-500' : ''} hover:bg-gray-800`}
-            >
-              <Heart className="w-4 h-4 mr-2" />
-              {favorites.includes(videoMetadata.name) ? 'Favorited' : 'Favorite'}
-            </Button>
-
-            <Button variant="ghost" className="hover:bg-gray-800">
-              <Share2 className="w-4 h-4 mr-2" />
-              Share
-            </Button>
-
-            <Button variant="ghost" className="hover:bg-gray-800">
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </Button>
-
-            <Button variant="ghost" className="hover:bg-gray-800">
-              <MoreVertical className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 
