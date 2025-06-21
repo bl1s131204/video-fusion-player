@@ -61,6 +61,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
 
   // Load video file
   const handleFileSelect = useCallback((file: File) => {
+    console.log('File selected:', file.name, file.type, file.size);
+    
     if (videoUrl) {
       URL.revokeObjectURL(videoUrl);
     }
@@ -88,8 +90,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
     });
 
     toast({
-      title: "Video loaded",
-      description: `${file.name} ready to play`
+      title: "Video loaded successfully",
+      description: `${file.name} is ready to play`
     });
   }, [videoUrl, toast]);
 
@@ -127,11 +129,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
   // Video event handlers
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
-      setDuration(videoRef.current.duration);
+      const duration = videoRef.current.duration;
+      setDuration(duration);
       setVideoMetadata(prev => prev ? {
         ...prev,
-        duration: videoRef.current!.duration
+        duration: duration
       } : null);
+      
+      console.log('Video metadata loaded:', {
+        duration: duration,
+        videoWidth: videoRef.current.videoWidth,
+        videoHeight: videoRef.current.videoHeight
+      });
     }
   };
 
@@ -154,23 +163,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
     if (error) {
       switch (error.code) {
         case error.MEDIA_ERR_ABORTED:
-          description = "Playback was aborted";
+          description = "Playback was aborted by user";
           break;
         case error.MEDIA_ERR_NETWORK:
-          description = "Network error occurred";
+          description = "Network error - check your connection";
           break;
         case error.MEDIA_ERR_DECODE:
-          description = "Video decode error - attempting to skip corrupted frames";
+          description = "Video decode error - attempting to recover";
           // Try to skip ahead to find playable content
           if (videoRef.current && currentTime < duration - 5) {
+            console.log('Attempting to skip corrupted section...');
             videoRef.current.currentTime = currentTime + 2;
+            return; // Don't show toast for decode errors, try to recover
           }
+          description = "Video file may be corrupted";
           break;
         case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
-          description = "Video format not supported";
+          description = "Video format not supported by your browser";
           break;
         default:
-          description = "Unknown playback error";
+          description = "Unknown playback error occurred";
       }
     }
     
@@ -357,7 +369,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // MX Player UI
+  // Enhanced MX Player UI
   const renderMXPlayerUI = () => (
     <div className="absolute inset-0 bg-black">
       {/* Enhanced File Selection Header */}
@@ -400,7 +412,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
           <div className="text-white text-center p-8">
             <div className="text-6xl mb-4">🎬</div>
             <div className="text-xl mb-2 font-medium">MX Player</div>
-            <div className="text-gray-400">Drag & drop a video file or use the file selector above</div>
+            <div className="text-gray-400">Select a video file to start playing</div>
           </div>
         )}
 
@@ -608,15 +620,21 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
       {/* Gesture Handler */}
       <GestureHandler
         containerRef={containerRef}
-        onVolumeChange={(delta) => setVolume(prev => Math.max(0, Math.min(1, prev + delta)))}
-        onBrightnessChange={(delta) => setBrightness(prev => Math.max(50, Math.min(150, prev + delta)))}
+        onVolumeChange={(delta) => {
+          const newVolume = Math.max(0, Math.min(1, volume + delta));
+          setVolume(newVolume);
+          if (videoRef.current) {
+            videoRef.current.volume = newVolume;
+          }
+        }}
+        onBrightnessChange={(delta) => setBrightness(prev => Math.max(50, Math.min(200, prev + delta)))}
         onSeek={(delta) => skipTime(delta)}
         onShowControls={resetControlsTimeout}
       />
     </div>
   );
 
-  // YouTube UI
+  // Enhanced YouTube UI
   const renderYouTubeUI = () => (
     <div className={`${isDarkTheme ? 'bg-gray-900 text-white' : 'bg-white text-black'} min-h-screen`}>
       {/* Enhanced File Selection Header */}
@@ -963,7 +981,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
       {/* Main UI */}
       {uiMode === 'mx' ? renderMXPlayerUI() : renderYouTubeUI()}
 
-      {/* Settings Panel */}
+      {/* Enhanced Settings Panel */}
       <SettingsPanel
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
@@ -977,6 +995,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
         onSubtitleDelayChange={setSubtitleDelay}
         showSubtitles={showSubtitles}
         onToggleSubtitles={setShowSubtitles}
+        rotation={rotation}
+        onRotationChange={setRotation}
+        volume={volume * 100}
+        onVolumeChange={(value) => {
+          const vol = value / 100;
+          setVolume(vol);
+          if (videoRef.current) {
+            videoRef.current.volume = vol;
+          }
+        }}
       />
 
       {/* Subtitle Manager */}
