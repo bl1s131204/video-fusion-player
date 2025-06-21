@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCw, Settings, Download, Share2, Heart, MoreVertical, PictureInPicture2, SkipBack, SkipForward, Rewind, FastForward } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, RotateCw, Settings, Download, Share2, Heart, MoreVertical, PictureInPicture2, SkipBack, SkipForward, Rewind, FastForward, Lock, Unlock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +33,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [isDarkTheme, setIsDarkTheme] = useState(true);
+  const [isLocked, setIsLocked] = useState(false);
   
   // File state
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -214,7 +214,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (!videoRef.current) return;
+      if (!videoRef.current || isLocked) return;
 
       switch (e.code) {
         case 'Space':
@@ -250,16 +250,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []);
+  }, [isLocked]);
 
   // Auto-hide controls
   const resetControlsTimeout = () => {
+    if (isLocked) return;
     setShowControls(true);
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
     }
     controlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying) {
+      if (isPlaying && !isLocked) {
         setShowControls(false);
       }
     }, 3000);
@@ -272,7 +273,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
         clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [isPlaying]);
+  }, [isPlaying, isLocked]);
 
   // Format time
   const formatTime = (time: number) => {
@@ -305,118 +306,143 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
             onPlay={handlePlay}
             onPause={handlePause}
             onError={handleError}
-            onClick={resetControlsTimeout}
+            onClick={!isLocked ? resetControlsTimeout : undefined}
           />
         ) : (
           <div className="text-white text-center">
-            <div className="text-6xl mb-4">📹</div>
-            <div className="text-xl mb-2">No video selected</div>
-            <div className="text-gray-400">Tap to select a video file</div>
+            <div className="text-6xl mb-4">🎬</div>
+            <div className="text-xl mb-2 font-medium">MX Player</div>
+            <div className="text-gray-400">Select a video to start playing</div>
           </div>
         )}
 
         {/* MX Player Controls Overlay */}
-        {showControls && (
-          <div className="absolute inset-0 bg-black/20">
-            {/* Top Bar */}
-            <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent">
-              <div className="flex items-center justify-between text-white">
-                <div className="flex items-center space-x-4">
+        {showControls && !isLocked && (
+          <div className="absolute inset-0">
+            {/* Top Status Bar */}
+            <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+              <div className="flex items-center justify-between text-white text-sm">
+                <div className="flex items-center space-x-3">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setUiMode('youtube')}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 text-xs px-2 py-1"
                   >
-                    Switch to YouTube UI
+                    YouTube Mode
                   </Button>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowSettings(true)}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <Settings className="w-4 h-4" />
-                  </Button>
+                <div className="flex items-center space-x-2 text-xs">
+                  <span>{formatTime(currentTime)}</span>
+                  <span className="text-gray-400">•</span> 
+                  <span className="text-orange-400">{Math.round(playbackRate * 100)}%</span>
                 </div>
               </div>
               {videoMetadata && (
-                <div className="mt-2 text-white text-sm">
-                  <div className="font-medium">{videoMetadata.name}</div>
-                  <div className="text-gray-300">
-                    {(videoMetadata.size / (1024 * 1024)).toFixed(1)} MB • {formatTime(videoMetadata.duration)}
+                <div className="mt-2 text-white">
+                  <div className="text-sm font-medium truncate">{videoMetadata.name}</div>
+                  <div className="text-xs text-gray-300 flex items-center space-x-2">
+                    <span>{(videoMetadata.size / (1024 * 1024)).toFixed(1)} MB</span>
+                    <span>•</span>
+                    <span>{formatTime(videoMetadata.duration)}</span>
+                    <span>•</span>
+                    <span className="text-orange-400">HD</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Center Play Button */}
-            <div className="absolute inset-0 flex items-center justify-center">
+            {/* Center Play/Pause Button */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <Button
                 variant="ghost"
                 size="lg"
                 onClick={togglePlay}
-                className="w-20 h-20 rounded-full bg-black/50 hover:bg-black/70 text-white border-2 border-white/30"
+                className="pointer-events-auto w-16 h-16 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/30 backdrop-blur-sm transition-all duration-200"
               >
-                {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8 ml-1" />}
+                {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
               </Button>
             </div>
 
-            {/* Side Controls */}
-            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex flex-col space-y-4">
+            {/* Left Side Gesture Indicator */}
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60">
+              <div className="text-xs text-center">
+                <div className="mb-1">☀️</div>
+                <div>Brightness</div>
+              </div>
+            </div>
+
+            {/* Right Side Gesture Indicator */}
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/60">
+              <div className="text-xs text-center">
+                <div className="mb-1">🔊</div>
+                <div>Volume</div>
+              </div>
+            </div>
+
+            {/* Side Control Panel */}
+            <div className="absolute right-3 top-1/4 flex flex-col space-y-3">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleRotate}
-                className="w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                className="w-10 h-10 rounded-full bg-black/50 hover:bg-orange-500/80 text-white border border-white/20 transition-colors"
               >
-                <RotateCw className="w-5 h-5" />
+                <RotateCw className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={toggleFullscreen}
-                className="w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                className="w-10 h-10 rounded-full bg-black/50 hover:bg-orange-500/80 text-white border border-white/20 transition-colors"
               >
-                {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={togglePictureInPicture}
-                className="w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                className="w-10 h-10 rounded-full bg-black/50 hover:bg-orange-500/80 text-white border border-white/20 transition-colors"
               >
-                <PictureInPicture2 className="w-5 h-5" />
+                <PictureInPicture2 className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSettings(true)}
+                className="w-10 h-10 rounded-full bg-black/50 hover:bg-orange-500/80 text-white border border-white/20 transition-colors"
+              >
+                <Settings className="w-4 h-4" />
               </Button>
             </div>
 
-            {/* Bottom Controls */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+            {/* Bottom Control Bar */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent">
               {/* Seek Bar */}
-              <div className="mb-4">
-                <Slider
-                  value={[duration > 0 ? (currentTime / duration) * 100 : 0]}
-                  onValueChange={handleSeek}
-                  max={100}
-                  step={0.1}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-white text-sm mt-1">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
+              <div className="px-4 pb-2 pt-4">
+                <div className="relative">
+                  <Slider
+                    value={[duration > 0 ? (currentTime / duration) * 100 : 0]}
+                    onValueChange={handleSeek}
+                    max={100}
+                    step={0.1}
+                    className="w-full [&_[role=slider]]:bg-orange-500 [&_[role=slider]]:border-orange-500 [&_.bg-primary]:bg-orange-500"
+                  />
+                  <div className="flex justify-between text-white text-xs mt-1">
+                    <span>{formatTime(currentTime)}</span>
+                    <span className="text-gray-300">-{formatTime(duration - currentTime)}</span>
+                  </div>
                 </div>
               </div>
 
               {/* Control Buttons */}
-              <div className="flex items-center justify-between text-white">
-                <div className="flex items-center space-x-2">
+              <div className="flex items-center justify-between px-4 pb-4">
+                <div className="flex items-center space-x-3">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => skipTime(-10)}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 p-2"
                   >
                     <Rewind className="w-5 h-5" />
                   </Button>
@@ -424,31 +450,68 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => skipTime(10)}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 p-2"
                   >
                     <FastForward className="w-5 h-5" />
                   </Button>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleMute}
+                      className="text-white hover:bg-white/20 p-2"
+                    >
+                      {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    </Button>
+                    <div className="w-16">
+                      <Slider
+                        value={[isMuted ? 0 : volume * 100]}
+                        onValueChange={handleVolumeChange}
+                        max={100}
+                        step={1}
+                        className="[&_[role=slider]]:bg-orange-500 [&_[role=slider]]:border-orange-500 [&_.bg-primary]:bg-orange-500"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex items-center space-x-2">
+                  <select
+                    value={playbackRate}
+                    onChange={(e) => changePlaybackSpeed(Number(e.target.value))}
+                    className="bg-black/50 text-white text-xs border border-white/30 rounded px-2 py-1 focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value={0.25}>0.25x</option>
+                    <option value={0.5}>0.5x</option>
+                    <option value={0.75}>0.75x</option>
+                    <option value={1}>1x</option>
+                    <option value={1.25}>1.25x</option>
+                    <option value={1.5}>1.5x</option>
+                    <option value={2}>2x</option>
+                  </select>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={toggleMute}
-                    className="text-white hover:bg-white/20"
+                    onClick={() => setIsLocked(!isLocked)}
+                    className={`text-white hover:bg-white/20 p-2 ${isLocked ? 'bg-orange-500/80' : ''}`}
                   >
-                    {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                    {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                   </Button>
-                  <div className="w-20">
-                    <Slider
-                      value={[isMuted ? 0 : volume * 100]}
-                      onValueChange={handleVolumeChange}
-                      max={100}
-                      step={1}
-                    />
-                  </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Locked Screen Overlay */}
+        {isLocked && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+            <div 
+              className="bg-black/80 text-white px-4 py-2 rounded-full flex items-center space-x-2 cursor-pointer"
+              onClick={() => setIsLocked(false)}
+            >
+              <Lock className="w-4 h-4" />
+              <span className="text-sm">Screen Locked - Tap to unlock</span>
             </div>
           </div>
         )}
