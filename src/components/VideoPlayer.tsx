@@ -7,6 +7,8 @@ import FileSelector from './FileSelector';
 import SubtitleManager from './SubtitleManager';
 import GestureHandler from './GestureHandler';
 import SettingsPanel from './SettingsPanel';
+import FileSelectionHeader from './FileSelectionHeader';
+import UIToggle from './UIToggle';
 
 interface VideoPlayerProps {}
 
@@ -91,6 +93,37 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
     });
   }, [videoUrl, toast]);
 
+  // Enhanced file handling
+  const clearVideo = useCallback(() => {
+    if (videoUrl) {
+      URL.revokeObjectURL(videoUrl);
+    }
+    setVideoUrl('');
+    setCurrentFile(null);
+    setVideoMetadata(null);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+  }, [videoUrl]);
+
+  // Enhanced drag and drop for the entire player area
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const files = Array.from(e.dataTransfer.files);
+    const videoFile = files.find(file => file.type.startsWith('video/'));
+    
+    if (videoFile) {
+      handleFileSelect(videoFile);
+    }
+  }, [handleFileSelect]);
+
   // Video event handlers
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
@@ -113,17 +146,39 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
 
   const handleError = (e: any) => {
     console.error('Video error:', e);
+    
+    const error = e.target?.error;
+    let errorMessage = "Playback Error";
+    let description = "An error occurred during playback";
+    
+    if (error) {
+      switch (error.code) {
+        case error.MEDIA_ERR_ABORTED:
+          description = "Playback was aborted";
+          break;
+        case error.MEDIA_ERR_NETWORK:
+          description = "Network error occurred";
+          break;
+        case error.MEDIA_ERR_DECODE:
+          description = "Video decode error - attempting to skip corrupted frames";
+          // Try to skip ahead to find playable content
+          if (videoRef.current && currentTime < duration - 5) {
+            videoRef.current.currentTime = currentTime + 2;
+          }
+          break;
+        case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+          description = "Video format not supported";
+          break;
+        default:
+          description = "Unknown playback error";
+      }
+    }
+    
     toast({
-      title: "Playback Error",
-      description: "Attempting to skip corrupted frames...",
+      title: errorMessage,
+      description,
       variant: "destructive"
     });
-    
-    // Try to recover from corrupted frames
-    if (videoRef.current) {
-      const currentPos = videoRef.current.currentTime;
-      videoRef.current.currentTime = currentPos + 1; // Skip 1 second ahead
-    }
   };
 
   // Playback controls
@@ -211,10 +266,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
     }
   };
 
-  // Keyboard shortcuts
+  // Enhanced keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (!videoRef.current || isLocked) return;
+
+      // Prevent shortcuts when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
 
       switch (e.code) {
         case 'Space':
@@ -223,19 +283,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          skipTime(-10);
+          skipTime(e.shiftKey ? -30 : -10);
           break;
         case 'ArrowRight':
           e.preventDefault();
-          skipTime(10);
+          skipTime(e.shiftKey ? 30 : 10);
           break;
         case 'ArrowUp':
           e.preventDefault();
-          setVolume(prev => Math.min(1, prev + 0.1));
+          handleVolumeChange([Math.min(100, (volume * 100) + 5)]);
           break;
         case 'ArrowDown':
           e.preventDefault();
-          setVolume(prev => Math.max(0, prev - 0.1));
+          handleVolumeChange([Math.max(0, (volume * 100) - 5)]);
           break;
         case 'KeyF':
           e.preventDefault();
@@ -245,12 +305,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
           e.preventDefault();
           toggleMute();
           break;
+        case 'KeyR':
+          e.preventDefault();
+          handleRotate();
+          break;
+        case 'Escape':
+          e.preventDefault();
+          if (isFullscreen) {
+            toggleFullscreen();
+          }
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [isLocked]);
+  }, [isLocked, volume, isFullscreen, togglePlay, skipTime, handleVolumeChange, toggleFullscreen, toggleMute, handleRotate]);
 
   // Auto-hide controls
   const resetControlsTimeout = () => {
@@ -290,6 +360,24 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
   // MX Player UI
   const renderMXPlayerUI = () => (
     <div className="absolute inset-0 bg-black">
+      {/* Enhanced File Selection Header */}
+      <FileSelectionHeader
+        hasVideo={!!videoUrl}
+        videoName={videoMetadata?.name}
+        onFileSelect={handleFileSelect}
+        onClearVideo={clearVideo}
+      />
+
+      {/* UI Toggle - positioned in top right */}
+      {videoUrl && (
+        <div className="absolute top-4 right-4 z-50">
+          <UIToggle
+            currentMode={uiMode}
+            onModeChange={setUiMode}
+          />
+        </div>
+      )}
+
       {/* Video Container */}
       <div className="relative w-full h-full flex items-center justify-center">
         {videoUrl ? (
@@ -309,15 +397,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
             onClick={!isLocked ? resetControlsTimeout : undefined}
           />
         ) : (
-          <div className="text-white text-center">
+          <div className="text-white text-center p-8">
             <div className="text-6xl mb-4">🎬</div>
             <div className="text-xl mb-2 font-medium">MX Player</div>
-            <div className="text-gray-400">Select a video to start playing</div>
+            <div className="text-gray-400">Drag & drop a video file or use the file selector above</div>
           </div>
         )}
 
         {/* MX Player Controls Overlay */}
-        {showControls && !isLocked && (
+        {showControls && !isLocked && videoUrl && (
           <div className="absolute inset-0">
             {/* Top Status Bar */}
             <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
@@ -531,6 +619,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
   // YouTube UI
   const renderYouTubeUI = () => (
     <div className={`${isDarkTheme ? 'bg-gray-900 text-white' : 'bg-white text-black'} min-h-screen`}>
+      {/* Enhanced File Selection Header */}
+      <FileSelectionHeader
+        hasVideo={!!videoUrl}
+        videoName={videoMetadata?.name}
+        onFileSelect={handleFileSelect}
+        onClearVideo={clearVideo}
+      />
+
       {/* YouTube Header */}
       <div className={`${isDarkTheme ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border-b sticky top-0 z-50`}>
         <div className="flex items-center justify-between px-4 py-3">
@@ -544,14 +640,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
           </div>
           
           <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setUiMode('mx')}
-              className={`${isDarkTheme ? 'text-white hover:bg-gray-800' : 'text-black hover:bg-gray-100'} text-sm px-3 py-1`}
-            >
-              MX Player Mode
-            </Button>
+            <UIToggle
+              currentMode={uiMode}
+              onModeChange={setUiMode}
+            />
+            
             <Button
               variant="ghost"
               size="sm"
@@ -593,7 +686,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
                     <Play className="w-8 h-8 ml-1" />
                   </div>
                   <div className="text-xl mb-2 font-medium">Select a video to watch</div>
-                  <div className="text-gray-400">Drag and drop or click to upload</div>
+                  <div className="text-gray-400">Drag and drop or use the file selector above</div>
                 </div>
               </div>
             )}
@@ -856,7 +949,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = () => {
   );
 
   return (
-    <div ref={containerRef} className="w-full h-screen relative">
+    <div 
+      ref={containerRef} 
+      className="w-full h-screen relative"
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       {/* File Selector */}
       {!videoUrl && (
         <FileSelector onFileSelect={handleFileSelect} />
